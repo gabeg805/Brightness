@@ -2,7 +2,7 @@
 What is it?
 ===========
 
-Control and display screen brightness.
+Display and control the screen brightness.
 
 
 
