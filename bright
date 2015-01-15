@@ -118,7 +118,7 @@ NOTIFY_PATH=`hash "${NOTIFY}" 2>&1`
 
 ## Display script usage
 function print_usage {
-    echo "Usage: bright [-h] [--off] [[--inc] [--dec] <value>] [<value>]"
+    echo "Usage: ${PROG_NAME} [-h] [--off] [[--inc] [--dec] <value>] [<value>]"
     exit 1
 }
 
