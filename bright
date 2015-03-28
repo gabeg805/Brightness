@@ -88,6 +88,9 @@
 ##
 ##     gabeg Jan 07 2015 <> Added the GUI notification display.
 ##
+##     gabeg Mar 27 2015 <> Moved the nofification program "hash" command test to 
+##                          right before it is needed.
+##
 ## **********************************************************************************
 
 
@@ -108,7 +111,6 @@ MAX=`head -1 "${MAX_BRIGHT_FILE}"`
 
 ## Gui notification bubble
 NOTIFY="noti"
-NOTIFY_PATH=`hash "${NOTIFY}" 2>&1`
 
 
 
@@ -158,7 +160,9 @@ function print_bright {
 function gui_display {
     
     ## Check if notification program exists
-    if [ ! -z "${NOTIFY_PATH}" ]; then 
+    exist=`hash "${NOTIFY}" 2>&1`
+    
+    if [ ! -z "${exist}" ]; then 
         echo "${PROG_NAME}: '${NOTIFY}' does not exist."
         exit 1
     fi
@@ -194,21 +198,15 @@ function set_brightness {
     ## Convert input to brightness value
     local curr=`head -1 "${CURR_BRIGHT_FILE}"`
     local rounded=$[ (${input} * ${MAX} / 100) + 1 ]
-    # local curr=`head -1 "${CURR_BRIGHT_FILE}"`
-    # local precise=`echo "scale=2; ${input} * ${MAX} / 100" | bc`
-    # local num=`echo "${precise}" | cut -f1 -d'.'`
-    # local rounded=$[ ${num} + 1 ]
     
     ## Calculate brightness change
     local value 
     
-    if [[ "$2" == '--inc' ]]; then 
-        value=$[ ${curr} + ${rounded} ]
-    elif [[ "$2" == '--dec' ]]; then 
-        value=$[ ${curr} - ${rounded} ]
-    else
-        value=${rounded}
-    fi
+    case "$2" in
+        '--inc') value=$[ ${curr} + ${rounded} ] ;;
+        '--dec') value=$[ ${curr} - ${rounded} ] ;;
+              *) value=${rounded} ;;
+    esac
     
     ## Check if output value is outside of limit range
     if [ ${value} -lt 0 ]; then
