@@ -21,3 +21,7 @@ Where *user* is the user that will use the brightness script.
 To alter the screen brightness, this script modifies a system file, initially
 owned by root. Initialization, allows the designated user to modify this file by
 changing the ownership to the user.
+
+## Uninstall
+
+Rebooting your machine will revert all changes made by *Installation*.
