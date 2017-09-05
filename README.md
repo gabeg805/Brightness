@@ -16,7 +16,7 @@ Control and display the screen brightness.
 $ sudo ./bright --init --user=<user>
 ```
 
-Where *<user>* is the user that will use the brightness script.
+Where _<user>_ is the user that will use the brightness script.
 
 To alter the screen brightness, this script modifies a system file, initially
 owned by root.
