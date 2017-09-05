@@ -1,271 +1,349 @@
 #!/bin/bash
-## 
-## CONTRIBUTORS: 
-## 
-##     * Gabriel Gonzalez (gabeg@bu.edu) 
-## 
-## 
-## LICENSE: 
-## 
-##     The MIT License (MIT)
-## 
-## 
-## NAME:
-##   
-##     bright - Display and control the screen brightness.
-## 
-## 
-## SYNTAX:
-##   
-##     bright [-h] [-d] [--off] [[--inc] [--dec] <value>] [<value>]
-## 
-## 
-## PURPOSE:
-## 
-##     Display/modify the brightness of the monitor, or turn it off entirely.
-## 
-## 
-## OPTIONS:
-##   
-##     -h
-##         Print program usage.
-## 
-##     -d, --display
-##         Display a GUI noification, using "noti", that shows the brightness level.
-## 
-##     --off
-##         Turn off the monitor.
-## 
-##     --inc <value>
-##         Increment the brightness by the given percentage value, from 1 - 100.
-## 
-##     --dec <value>
-##         Decrement the brightness by the given percentage value, from 1 - 100.
-## 
-##     <value>
-##         Set the brightness to the given percentage value, from 1 - 100.
-## 
-## 
-## FUNCTIONS:
-##   
-##     print_usage    - Prints program usage.
-## 
-##     get_percent    - Calculate the current brightness as a percent.
-## 
-##     print_bright   - Print brightness level.
-## 
-##     gui_display    - Display brightness information using the GUI.
-## 
-##     set_brightness - Set the brightness.
-## 
-## 
-## FILE STRUCTURE:
-##   
-##     * Print Program Usage
-##     * Get Brightness Percent
-##     * Print Brightness Level
-##     * GUI Brightness Notification
-##     * Set Screen Brightness
-##     * Control Computer Screen 
-##   
-##   
-## MODIFICATION HISTORY:
-##   
-##     gabeg Mar 02 2014 <> Created.
-## 
-##     gabeg Apr 26 2014 <> Changed input parameters.
-## 
-##     gabeg Jul 01 2014 <> Added functions to increase readability.
-##
-##     gabeg Dec 03 2014 <> Removed functions that weren't needed anymore, such as:
-##                          "step_change_brightness", "default_brightness", and 
-##                          "conv_per_to_val".
-##
-##     gabeg Jan 01 2015 <> Remove "is_int". Made reused variables global. If user 
-##                          inputs a percentage value outside of the limit range 
-##                          (1-100), set the input value to either 1 
-##                          (if less than 1) or 100 (if greater than 100).
-##
-##     gabeg Jan 07 2015 <> Added the GUI notification display.
-##
-##     gabeg Mar 27 2015 <> Moved the nofification program "hash" command test to 
-##                          right before it is needed.
-##
-## **********************************************************************************
+# ******************************************************************************
+# 
+# Name:    bright
+# Author:  Gabriel Gonzalez
+# Email:   gabeg@bu.edu
+# License: The MIT License (MIT)
+# 
+# Syntax: bright [options] [args]
+# 
+# Description: Control and display the screen brightness.
+# 
+# Notes: None.
+# 
+# ******************************************************************************
 
+# Globals
+PROG="${0##*/}"
+BRIGHTDIR="/sys/class/backlight/intel_backlight"
 
+# Options
+VERBOSE=
 
-## ================
-## GLOBAL VARIABLES
-## ================
+# Source utility
+. ../lib/util.sh
 
-## Program information
-ARGV=("$@")
-PROG_NAME=`basename $0`
+# Exit statuses
+STATUS_NORMAL=0
+STATUS_GETOPT=1
+STATUS_ARGS=2
+STATUS_SETVAL=10
+STATUS_USER=11
 
-## Brightness Values
-DIR="/sys/class/backlight/intel_backlight"
-CURR_BRIGHT_FILE="${DIR}/brightness"
-MAX_BRIGHT_FILE="${DIR}/max_brightness"
-MAX=`head -1 "${MAX_BRIGHT_FILE}"`
+# ******************************************************************************
+# Main
+main()
+{
+    [ $# -eq 0 ] && usage && exit ${STATUS_NORMAL}
 
-## Gui notification bubble
-NOTIFY="noti"
+    short="hvu:bids:"
+    long="help,verbose,init,user:,brightness,inc,dec,set:,off"
+    args=$(getopt -o "${short}" --long "${long}" --name "${PROG}" -- "${@}")
 
+    [ $? -ne 0 ] && usage && exit ${STATUS_GETOPT}
+    eval set -- "${args}"
 
+    # Options
+    INITUSER=
+    INIT=
+    PRINT=
+    INCREMENT=
+    DECREMENT=
+    SET=
+    OFF=
 
-## ###############################
-## ##### PRINT PROGRAM USAGE #####
-## ###############################
+    # Parse options
+    while true; do
+        case "${1}" in
+            # Print usage
+            -h|--help)
+                usage
+                exit 0
+                ;;
 
-## Display script usage
-function print_usage {
-    echo "Usage: ${PROG_NAME} [-h] [--off] [[--inc] [--dec] <value>] [<value>]"
-    exit 1
-}
+            # Verbose
+            -v|--verbose)
+                VERBOSE=true
+                ;;
 
+            # Set an initial user
+            -u|--user)
+                shift
+                INITUSER="${1}"
+                ;;
 
+            # Initialize
+            --init)
+                check_multi_arg "INIT"
+                INIT=true
+                ;;
 
-## ##################################
-## ##### GET BRIGHTNESS PERCENT ##### 
-## ##################################
+            # Print screen brightness
+            -b|--brightness)
+                check_multi_arg "PRINT"
+                PRINT=true
+                ;;
 
-## Calculate the current percent brightness value
-function get_percent {
-    local curr=`head -1 "${CURR_BRIGHT_FILE}"`  
-    local precise=`echo "scale=2; ${curr} / ${MAX} * 100" | bc`
-    local rounded=`echo "${precise} / 1" | bc`
-    
-    echo "${rounded}"
-}
+            # Increment screen brightness
+            -i|--inc)
+                check_multi_arg "INCREMENT"
+                INCREMENT=true
+                ;;
 
+            # Decrement screen brightness
+            -d|--dec)
+                check_multi_arg "DECREMENT"
+                DECREMENT=true
+                ;;
 
+            # Set brightness to given value
+            -s|--set)
+                shift
+                check_multi_arg "SET"
+                SET="${1}"
+                ;;
 
-## ##################################
-## ##### PRINT BRIGHTNESS LEVEL #####
-## ##################################
+            # Turn off monitor
+            --off)
+                check_multi_arg "OFF"
+                OFF=true
+                ;;
 
-## Print brightness level
-function print_bright {
-    echo "Brightness: $(get_percent)%"
-}
+            # End of options
+            --)
+                break
+                ;;
+        esac
+        shift
+    done
 
-
-
-## #######################################
-## ##### GUI BRIGHTNESS NOTIFICATION #####
-## #######################################
-
-## GUI notification for battery information
-function gui_display {
-    
-    ## Check if notification program exists
-    exist=`hash "${NOTIFY}" 2>&1`
-    
-    if [ ! -z "${exist}" ]; then 
-        echo "${PROG_NAME}: '${NOTIFY}' does not exist."
-        exit 1
-    fi
-    
-    ## Display current battery level
-    ${NOTIFY} --time 5 -b "$(print_bright)" 
-}
-
-
-
-## #################################
-## ##### SET SCREEN BRIGHTNESS #####
-## #################################
-
-## Set the brightness
-function set_brightness {
-    
-    ## Check if step value is a valid integer
-    if [ "$1" -eq "$1" ] 2>/dev/null; then
-        :
+    # Run options
+    if [ -n "${INIT}" ]; then
+        init_brightness "${INITUSER}"
+    elif [ -n "${PRINT}" ]; then
+        print_brightness
+    elif [ -n "${INCREMENT}" ]; then
+        step_brightness_level "+"
+        print_brightness
+    elif [ -n "${DECREMENT}" ]; then
+        step_brightness_level "-"
+        print_brightness
+    elif [ -n "${SET}" ]; then
+        set_brightness_level "${SET}"
+        print_brightness
+    elif [ -n "${OFF}" ]; then
+        xset dpms force off
     else
-        print_usage
+        :
     fi
-    
-    ## Check if input value is outside of limit range
-    local input=$1
-    if [ ${input} -lt 0 ]; then
-        input=0
-    elif [ ${input} -gt 100 ]; then
-        input=100
-    fi
-    
-    ## Convert input to brightness value
-    local curr=`head -1 "${CURR_BRIGHT_FILE}"`
-    local rounded=$[ (${input} * ${MAX} / 100) + 1 ]
-    
-    ## Calculate brightness change
-    local value 
-    
-    case "$2" in
-        '--inc') value=$[ ${curr} + ${rounded} ] ;;
-        '--dec') value=$[ ${curr} - ${rounded} ] ;;
-              *) value=${rounded} ;;
-    esac
-    
-    ## Check if output value is outside of limit range
-    if [ ${value} -lt 0 ]; then
-        value=0
-    elif [ ${value} -gt ${MAX} ]; then
-        value=$MAX
-    fi
-    
-    ## Set brightness
-    echo "${value}" > "${CURR_BRIGHT_FILE}"
-    print_bright
 }
 
+# ******************************************************************************
+# Print program usage
+usage()
+{
+    echo "Usage: ${PROG} [options] [args]"
+    echo
+    echo "Options:"
+    echo "    -h, --help"
+    echo "        Print program usage."
+    echo
+    echo "    -v, --verbose"
+    echo "        Verbose output."
+    echo
+    echo "    --init"
+    echo "        Initialize the brightness script for a user."
+    echo
+    echo "    -u, --user <user>"
+    echo "        Set a user to initialize the brightness script for."
+    echo
+    echo "    -b, --brightness"
+    echo "        Print screen brightness."
+    echo
+    echo "    -i, --inc"
+    echo "        Increment screen brightness level."
+    echo
+    echo "    -d, --dec"
+    echo "        Decrement screen brightness level."
+    echo
+    echo "    -s, --set <value>"
+    echo "        Set screen brightness level. Allowed values: [0 - 100]."
+    echo
+    echo "    --off"
+    echo "        Turn off screen."
+    echo
+    echo "Arguments:"
+    echo "    <value>"
+    echo "        An integer from [0 - 100]."
+    echo
+    echo "    <user>"
+    echo "        A user to initialize the brightness script for."
+}
 
+# ******************************************************************************
+# Initialize brightness for a user
+init_brightness()
+{
+    local user="${1}"
+    if [ -z "${user}" ]; then
+        print_err "Unable to initialize brightness: No user specified."
+        exit ${STATUS_USER}
+    fi
 
-## ###################################
-## ##### CONTROL COMPUTER SCREEN #####
-## ###################################
+    print_info "Initializing brightness script..."
+    chown "${user}:${user}" "$(get_brightness_file)"
+    if [ $? -ne 0 ]; then
+        exit ${STATUS_USER}
+    fi
+    print_info "User '${user}' now able to control brightness."
+}
 
-## Choose what action to execute to the screen
-function main {
-    
-    ## Input Parameters
-    case "${ARGV[0]}" in
-        
-        ## Print the help screen
-        "-h")
-            print_usage
+# ******************************************************************************
+# Print brightness level
+print_brightness()
+{
+    echo "Brightness: $(get_brightness_percent)%"
+}
+
+# ******************************************************************************
+# Set the brightness
+set_brightness_level()
+{
+    local value="${1}"
+
+    # Check brightness value
+    if ! is_integer "${value}" || [ ${value} -lt 0 -o ${value} -gt 100 ]; then
+        print_err "Unable to set brightness: Value must be between 0 - 100."
+        exit ${STATUS_SETVAL}
+    fi
+
+    # Convert input to brightness value
+    local cur=$(get_brightness_value)
+    local max=$(get_brightness_max_value)
+    local newvalue=$(echo "scale=2; ${value} / 100 * ${max}" \
+        | bc | sed 's/\...$//')
+
+    # Set brightness
+    echo "${newvalue}" > "$(get_brightness_file)"
+}
+
+# ******************************************************************************
+# Step brightness level by incrementing/decrementing
+step_brightness_level()
+{
+    local operator="${1}"
+    local cur=$(get_brightness_value)
+    local max=$(get_brightness_max_value)
+    local step=$(echo "scale=2; ${max} / 10" | bc | sed 's/\...$//')
+    local newvalue=$(echo "(${cur} ${operator} ${step}) * 100 / ${max}" | bc)
+    set_brightness_level "${newvalue}"
+}
+
+# ******************************************************************************
+# Return screen brightness percentage
+get_brightness_percent()
+{
+    local cur=$(get_brightness_value)
+    local max=$(get_brightness_max_value)
+    local percent=$(echo "scale=2; ${cur} / ${max} * 100" | bc)
+    echo "${percent} / 1" | bc
+}
+
+# ******************************************************************************
+# Return current brightness
+get_brightness_value()
+{
+    local file="$(get_brightness_file)"
+    head -1 "${file}"
+}
+
+# ******************************************************************************
+# Return current brightness
+get_brightness_max_value()
+{
+    local file="$(get_brightness_max_file)"
+    head -1 "${file}"
+}
+
+# ******************************************************************************
+# Return brightness file
+get_brightness_file()
+{
+    echo "${BRIGHTDIR}/brightness"
+}
+
+# ******************************************************************************
+# Return max brightness file
+get_brightness_max_file()
+{
+    echo "${BRIGHTDIR}/max_brightness"
+}
+
+# ******************************************************************************
+# Check if multiple arguments are used when they should not be
+check_multi_arg()
+{
+    case "${1}" in
+        INIT)
+            if [ -n "${PRINT}" -o -n "${INCREMENT}" -o -n "${DECREMENT}" \
+                -o -n "${SET}" -o -n "${OFF}" ]
+            then
+                print_err "Unable to initialize script: Must specify only one option."
+                exit ${STATUS_ARGS}
+            fi
             ;;
-        
-        ## Print Current Screen Brightness
-        "")
-            print_bright
+
+        PRINT)
+            if [ -n "${INIT}" -o -n "${INCREMENT}" -o -n "${DECREMENT}" \
+                -o -n "${SET}" -o -n "${OFF}" ]
+            then
+                print_err "Unable to print brightness level: Must specify only one option."
+                exit ${STATUS_ARGS}
+            fi
             ;;
-        
-        "-d"|"--display")
-            gui_display
+
+        INCREMENT)
+            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${DECREMENT}" \
+                -o -n "${SET}" -o -n "${OFF}" ]
+            then
+                print_err "Unable to increment brightness level: Must specify only one option."
+                exit ${STATUS_ARGS}
+            fi
             ;;
-        
-        ## Turn Off Monitor 
-        "--off")
-            xset dpms force off
+
+        DECREMENT)
+            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${INCREMENT}" \
+                -o -n "${SET}" -o -n "${OFF}" ]
+            then
+                print_err "Unable to decrement brightness level: Must specify only one option."
+                exit ${STATUS_ARGS}
+            fi
             ;;
-        
-        ## Increment/Decrement Screen Brightness
-        "--inc"|"--dec")
-            set_brightness "${ARGV[1]}" "${ARGV[0]}"
+
+        SET)
+            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${INCREMENT}" \
+                -o -n "${DECREMENT}" -o -n "${OFF}" ]
+            then
+                print_err "Unable to set brightness level: Must specify only one option."
+                exit ${STATUS_ARGS}
+            fi
             ;;
-        
-        ## Set brightness to given value
+
+        OFF)
+            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${INCREMENT}" \
+                -o -n "${DECREMENT}" -o -n "${SET}" ]
+            then
+                print_err "Unable to turn off screen: Must specify only one option."
+                exit ${STATUS_ARGS}
+            fi
+            ;;
+
         *)
-            set_brightness "${ARGV[0]}"
             ;;
     esac
-    
-    exit 0
 }
 
-
-
-## Execute screen brightness options
-main 
+# ******************************************************************************
+# Run script
+main "${@}"

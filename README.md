@@ -1,49 +1,33 @@
-===========
-What is it?
-===========
+# BRIGHT
 
-Display and control the screen brightness.
+## What is it?
 
+Control and display the screen brightness.
 
+## Requirements
 
-=============
-Documentation
-=============
+```
+- xset
+```
 
-Program documentation can be found in the header of the program.
+## Installation
 
+```
+$ sudo ./bright --init --user=<user>
+```
 
+Where *<user>* is the user that will use the brightness script.
 
-============
-Installation
-============
+To alter the screen brightness, this script modifies a system file, initially
+owned by root.
 
-Update your PATH environment variable in your shell rc file with:
-    
-    $ export PATH="${PATH}":"/PATH/TO/PROGRAM/bright"
+Initialization, allows the designated user to modify this file by changing the
+ownership to the user.
 
-Now the program is ready for use!
+Initializing the script will change the ownership of the brightness file, to the
+designated user, thus allowing them to modify the file. The brightness file is
+located at:
 
-
-
-========
-Contacts
-========
-
-If you have any problems, feel free to email me at 'gabeg@bu.edu'.
-
-
-
-==================
-Potential Problems
-==================
-
-- TBD
-
-
-
-=====
-To-Do
-=====
-
-- TBD
+```
+/sys/class/backlight/intel_backlight/brightness
+```
