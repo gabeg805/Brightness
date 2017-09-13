@@ -23,7 +23,7 @@ BRIGHTDIR="/sys/class/backlight/intel_backlight"
 VERBOSE=
 
 # Source utility
-. "${PROGDIR}"/../lib/bash/util.sh
+. "${PROGDIR}/../lib/bash/util.sh"
 
 # Exit statuses
 STATUS_NORMAL=0
