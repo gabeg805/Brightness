@@ -16,13 +16,14 @@
 
 # Globals
 PROG="${0##*/}"
+PROGDIR=$(dirname "$(readlink -f "${0}")")
 BRIGHTDIR="/sys/class/backlight/intel_backlight"
 
 # Options
 VERBOSE=
 
 # Source utility
-. ../lib/util.sh
+. "${PROGDIR}"/../lib/bash/util.sh
 
 # Exit statuses
 STATUS_NORMAL=0
