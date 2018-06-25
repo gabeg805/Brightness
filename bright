@@ -48,8 +48,8 @@ main()
     fi
 
     # Parse options
-    local short="hdDios:S"
-    local long="help,decrement,delta,increment,init,off,set:,short"
+    local short="hdD:ios:S"
+    local long="help,decrement,delta:,increment,init,off,set:,short"
     local args=$(getopt -o "${short}" --long "${long}" --name "${PROJECT}" \
                         -- "${@}")
     if [ $? -ne 0 ]
