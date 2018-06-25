@@ -1,27 +1,19 @@
-# BRIGHT
+# bright
 
-## What is it?
+## Introduction
 
 Control and display the screen brightness.
 
 ## Requirements
 
+- xorg-xset
+
+## Initialize
+
+Changing the brightness involves modifying a system file, which is owned by
+root. As a result, the permissions of the files need to be changed.
+
+Initialize the brightness script with the following command.
 ```
-- xset
+sudo ./bright --init
 ```
-
-## Installation
-
-```
-$ sudo ./bright --init --user=<user>
-```
-
-Where *user* is the user that will use the brightness script.
-
-To alter the screen brightness, this script modifies a system file, initially
-owned by root. Initialization, allows the designated user to modify this file by
-changing the ownership to the user.
-
-## Uninstall
-
-Rebooting your machine will revert all changes made by *Installation*.

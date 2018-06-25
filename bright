@@ -1,118 +1,95 @@
 #!/bin/bash
-# ******************************************************************************
+# ------------------------------------------------------------------------------
 # 
-# Name:    bright
-# Author:  Gabriel Gonzalez
-# Email:   gabeg@bu.edu
-# License: The MIT License (MIT)
+# Name: bright
+# Author: Gabe Gonzalez
 # 
-# Syntax: bright [options] [args]
+# Brief: Control and display the screen brightness.
 # 
-# Description: Control and display the screen brightness.
-# 
-# Notes: None.
-# 
-# ******************************************************************************
+# ------------------------------------------------------------------------------
 
-# Globals
-PROG="${0##*/}"
-PROGDIR=$(dirname "$(readlink -f "${0}")")
-BRIGHTDIR="/sys/class/backlight/intel_backlight"
+##
+# Program name.
+##
+PROJECT="${0##*/}"
 
-# Options
-VERBOSE=
+##
+# Files/directories.
+##
+BACKLIGHT_DIR="/sys/class/backlight/intel_backlight"
+BRIGHTNESS_FILE="${BACKLIGHT_DIR}/brightness"
+BRIGHTNESS_MAX_FILE="${BACKLIGHT_DIR}/max_brightness"
 
-# Source utility
-. "${PROGDIR}/../lib/bash/util.sh"
+##
+# Options.
+##
+DECREMENT=
+DELTA=5
+INCREMENT=
+INIT=
+OFF=
+SET=
+SHORT=
 
-# Exit statuses
-STATUS_NORMAL=0
-STATUS_GETOPT=1
-STATUS_ARGS=2
-STATUS_SETVAL=10
-STATUS_USER=11
+##
+# Exit statuses.
+##
+EXIT_BRIGHT_INVALID_VALUE=
 
-# ******************************************************************************
-# Main
+##
+# Main.
+##
 main()
 {
-    [ $# -eq 0 ] && usage && exit ${STATUS_NORMAL}
-
-    short="hvu:bids:"
-    long="help,verbose,init,user:,brightness,inc,dec,set:,off"
-    args=$(getopt -o "${short}" --long "${long}" --name "${PROG}" -- "${@}")
-
-    [ $? -ne 0 ] && usage && exit ${STATUS_GETOPT}
-    eval set -- "${args}"
-
-    # Options
-    INITUSER=
-    INIT=
-    PRINT=
-    INCREMENT=
-    DECREMENT=
-    SET=
-    OFF=
+    if [ $# -eq 0 ]
+    then
+        bright_print
+        return $?
+    fi
 
     # Parse options
-    while true; do
+    local short="hdDios:S"
+    local long="help,decrement,delta,increment,init,off,set:,short"
+    local args=$(getopt -o "${short}" --long "${long}" --name "${PROJECT}" \
+                        -- "${@}")
+    if [ $? -ne 0 ]
+    then
+        usage
+        exit 1
+    fi
+    eval set -- "${args}"
+
+    while true
+    do
         case "${1}" in
-            # Print usage
             -h|--help)
                 usage
                 exit 0
                 ;;
-
-            # Verbose
-            -v|--verbose)
-                VERBOSE=true
-                ;;
-
-            # Set an initial user
-            -u|--user)
-                shift
-                INITUSER="${1}"
-                ;;
-
-            # Initialize
-            --init)
-                check_multi_arg "INIT"
-                INIT=true
-                ;;
-
-            # Print screen brightness
-            -b|--brightness)
-                check_multi_arg "PRINT"
-                PRINT=true
-                ;;
-
-            # Increment screen brightness
-            -i|--inc)
-                check_multi_arg "INCREMENT"
-                INCREMENT=true
-                ;;
-
-            # Decrement screen brightness
-            -d|--dec)
-                check_multi_arg "DECREMENT"
+            -d|--decrement)
                 DECREMENT=true
                 ;;
-
-            # Set brightness to given value
-            -s|--set)
+            -D|--delta)
                 shift
-                check_multi_arg "SET"
-                SET="${1}"
+                DELTA="${1}"
                 ;;
-
-            # Turn off monitor
-            --off)
-                check_multi_arg "OFF"
+            -i|--increment)
+                INCREMENT=true
+                ;;
+            --init)
+                INIT=true
+                ;;
+            -o|--off)
                 OFF=true
                 ;;
-
-            # End of options
-            --)
+            -s|--set)
+                shift
+                SET="${1}"
+                ;;
+            -S|--short)
+                SHORT=true
+                ;;
+            *)
                 break
                 ;;
         esac
@@ -120,231 +97,215 @@ main()
     done
 
     # Run options
-    if [ -n "${INIT}" ]; then
-        init_brightness "${INITUSER}"
-    elif [ -n "${PRINT}" ]; then
-        print_brightness
-    elif [ -n "${INCREMENT}" ]; then
-        step_brightness_level "+"
-        print_brightness
-    elif [ -n "${DECREMENT}" ]; then
-        step_brightness_level "-"
-        print_brightness
-    elif [ -n "${SET}" ]; then
-        set_brightness_level "${SET}"
-        print_brightness
-    elif [ -n "${OFF}" ]; then
-        xset dpms force off
+    if [ -n "${DECREMENT}" ]
+    then
+        bright_decrement
+    elif [ -n "${INCREMENT}" ]
+    then
+        bright_increment
+    elif [ -n "${INIT}" ]
+    then
+        bright_init
+    elif [ -n "${OFF}" ]
+    then
+        bright_off
+    elif [ -n "${SET}" ]
+    then
+        bright_set "${SET}"
+        bright_print
     else
-        :
+        bright_print
     fi
+
+    return $?
 }
 
-# ******************************************************************************
-# Print program usage
+##
+# Print program usage.
+##
 usage()
 {
-    echo "Usage: ${PROG} [options] [args]"
+    echo "Usage: ${PROJECT} [options] [args]"
     echo
     echo "Options:"
     echo "    -h, --help"
     echo "        Print program usage."
     echo
-    echo "    -v, --verbose"
-    echo "        Verbose output."
+    echo "    -d, --decrement"
+    echo "        Decrement screen brightness level."
     echo
-    echo "    --init"
-    echo "        Initialize the brightness script for a user."
+    echo "    -D, --delta=<delta>"
+    echo "        The value to add or subtract to the current screen brightness"
+    echo "        when incrementing or decrementing."
     echo
-    echo "    -u, --user <user>"
-    echo "        Set a user to initialize the brightness script for."
-    echo
-    echo "    -b, --brightness"
-    echo "        Print screen brightness."
-    echo
-    echo "    -i, --inc"
+    echo "    -i, --increment"
     echo "        Increment screen brightness level."
     echo
-    echo "    -d, --dec"
-    echo "        Decrement screen brightness level."
+    echo "    --init"
+    echo "        Initialize the brightness script."
+    echo
+    echo "    -o, --off"
+    echo "        Turn off screen."
     echo
     echo "    -s, --set <value>"
     echo "        Set screen brightness level. Allowed values: [0 - 100]."
     echo
-    echo "    --off"
-    echo "        Turn off screen."
+    echo "    -S, --short"
+    echo "        Shorten the printed output."
     echo
     echo "Arguments:"
-    echo "    <value>"
-    echo "        An integer from [0 - 100]."
+    echo "    <delta>"
+    echo "        An integer from [0 - N]. Where N is the current screen"
+    echo "        brightness subtracted from the max screen brightness. In"
+    echo "        other words, any value that, when added to the current"
+    echo "        screen brightness, does not exceed the max."
     echo
-    echo "    <user>"
-    echo "        A user to initialize the brightness script for."
+    echo "    <value>"
+    echo "        An integer value from [0 - 100]."
 }
 
-# ******************************************************************************
-# Initialize brightness for a user
-init_brightness()
+##
+# Print brightness level.
+##
+bright_print()
 {
-    local user="${1}"
-    if [ -z "${user}" ]; then
-        print_err "Unable to initialize brightness: No user specified."
-        exit ${STATUS_USER}
+    local value=$(echo "$(bright_get_percent) / 1" | bc)
+    local msg="${value}%"
+    if [ -n "${SHORT}" ]
+    then
+        echo "${msg}"
+    else
+        echo "Brightness: ${msg}"
     fi
-
-    print_info "Initializing brightness script..."
-    chown "${user}:${user}" "$(get_brightness_file)"
-    if [ $? -ne 0 ]; then
-        exit ${STATUS_USER}
-    fi
-    print_info "User '${user}' now able to control brightness."
 }
 
-# ******************************************************************************
-# Print brightness level
-print_brightness()
+##
+# Decrement the screen brightness.
+##
+bright_decrement()
 {
-    echo "Brightness: $(get_brightness_percent)%"
+    bright_delta "-" "${DELTA}"
 }
 
-# ******************************************************************************
-# Set the brightness
-set_brightness_level()
+##
+# Increment the screen brightness.
+##
+bright_increment()
 {
-    local value="${1}"
-
-    # Check brightness value
-    if ! is_integer "${value}" || [ ${value} -lt 0 -o ${value} -gt 100 ]; then
-        print_err "Unable to set brightness: Value must be between 0 - 100."
-        exit ${STATUS_SETVAL}
-    fi
-
-    # Convert input to brightness value
-    local cur=$(get_brightness_value)
-    local max=$(get_brightness_max_value)
-    local newvalue=$(echo "scale=2; ${value} / 100 * ${max}" \
-        | bc | sed 's/\...$//')
-
-    # Set brightness
-    echo "${newvalue}" > "$(get_brightness_file)"
+    bright_delta "+" "${DELTA}"
 }
 
-# ******************************************************************************
-# Step brightness level by incrementing/decrementing
-step_brightness_level()
+##
+# Step brightness level by incrementing/decrementing.
+##
+bright_delta()
 {
     local operator="${1}"
-    local cur=$(get_brightness_value)
-    local max=$(get_brightness_max_value)
-    local step=$(echo "scale=2; ${max} / 10" | bc | sed 's/\...$//')
-    local newvalue=$(echo "(${cur} ${operator} ${step}) * 100 / ${max}" | bc)
-    set_brightness_level "${newvalue}"
+    local delta="${2}"
+    local percent=$(bright_get_percent)
+    local value=$(echo "scale=4; ${percent} ${operator} ${delta}" | bc)
+    bright_set "${value}"
+    bright_print
 }
 
-# ******************************************************************************
-# Return screen brightness percentage
-get_brightness_percent()
+##
+# Initialize brightness script.
+##
+bright_init()
 {
-    local cur=$(get_brightness_value)
-    local max=$(get_brightness_max_value)
-    local percent=$(echo "scale=2; ${cur} / ${max} * 100" | bc)
-    echo "${percent} / 1" | bc
+    echo ":: Initializing brightness settings."
+    chmod 666 "${BRIGHTNESS_FILE}"
 }
 
-# ******************************************************************************
-# Return current brightness
-get_brightness_value()
+##
+# Turn the screen off.
+##
+bright_off()
 {
-    local file="$(get_brightness_file)"
-    head -1 "${file}"
+    xset dpms force off
 }
 
-# ******************************************************************************
-# Return current brightness
-get_brightness_max_value()
+##
+# Set the brightness level.
+##
+bright_set()
 {
-    local file="$(get_brightness_max_file)"
-    head -1 "${file}"
+    local value="${1}"
+    local max=$(bright_get_max)
+    local check=$(echo "(0 <= ${value}) && (${value} <= 100)" | bc)
+    if [ ${check} -eq 0 ]
+    then
+        print_err "Unable to set brightness: Value must be between 0 to 100."
+        exit ${EXIT_BRIGHT_INVALID_VALUE}
+    fi
+    local newvalue=$(echo "scale=4; ${value} * ${max} / 100" | bc)
+    bright_value_round "${newvalue}"> "${BRIGHTNESS_FILE}"
 }
 
-# ******************************************************************************
-# Return brightness file
-get_brightness_file()
+##
+# Round the input value to the nearest integer.
+##
+bright_value_round()
 {
-    echo "${BRIGHTDIR}/brightness"
+    local value="${1}"
+    local decimal="${value##*.}"
+    local locheck=$(echo "${decimal:0:2} < 50" | bc)
+    if [ ${locheck} -eq 1 ]
+    then
+        echo "${value} / 1" | bc
+    else
+        echo "(${value} + 1) / 1" | bc
+    fi
 }
 
-# ******************************************************************************
-# Return max brightness file
-get_brightness_max_file()
+##
+# Return screen brightness as a percentage.
+##
+bright_get_percent()
 {
-    echo "${BRIGHTDIR}/max_brightness"
+    local value=$(bright_get_value)
+    local max=$(bright_get_max)
+    local percent=$(echo "scale=4; ${value} / ${max} * 100" | bc)
+    bright_value_round "${percent}"
 }
 
-# ******************************************************************************
-# Check if multiple arguments are used when they should not be
-check_multi_arg()
+##
+# Return the current brightness value.
+##
+bright_get_value()
 {
-    case "${1}" in
-        INIT)
-            if [ -n "${PRINT}" -o -n "${INCREMENT}" -o -n "${DECREMENT}" \
-                -o -n "${SET}" -o -n "${OFF}" ]
-            then
-                print_err "Unable to initialize script: Must specify only one option."
-                exit ${STATUS_ARGS}
-            fi
-            ;;
-
-        PRINT)
-            if [ -n "${INIT}" -o -n "${INCREMENT}" -o -n "${DECREMENT}" \
-                -o -n "${SET}" -o -n "${OFF}" ]
-            then
-                print_err "Unable to print brightness level: Must specify only one option."
-                exit ${STATUS_ARGS}
-            fi
-            ;;
-
-        INCREMENT)
-            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${DECREMENT}" \
-                -o -n "${SET}" -o -n "${OFF}" ]
-            then
-                print_err "Unable to increment brightness level: Must specify only one option."
-                exit ${STATUS_ARGS}
-            fi
-            ;;
-
-        DECREMENT)
-            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${INCREMENT}" \
-                -o -n "${SET}" -o -n "${OFF}" ]
-            then
-                print_err "Unable to decrement brightness level: Must specify only one option."
-                exit ${STATUS_ARGS}
-            fi
-            ;;
-
-        SET)
-            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${INCREMENT}" \
-                -o -n "${DECREMENT}" -o -n "${OFF}" ]
-            then
-                print_err "Unable to set brightness level: Must specify only one option."
-                exit ${STATUS_ARGS}
-            fi
-            ;;
-
-        OFF)
-            if [ -n "${INIT}" -o -n "${PRINT}" -o -n "${INCREMENT}" \
-                -o -n "${DECREMENT}" -o -n "${SET}" ]
-            then
-                print_err "Unable to turn off screen: Must specify only one option."
-                exit ${STATUS_ARGS}
-            fi
-            ;;
-
-        *)
-            ;;
-    esac
+    local file="${BRIGHTNESS_FILE}"
+    local line=
+    read -r line < "${file}"
+    echo "${line}"
 }
 
-# ******************************************************************************
-# Run script
+##
+# Return the maximum brightness value.
+##
+bright_get_max()
+{
+    local file="${BRIGHTNESS_MAX_FILE}"
+    local line=
+    read -r line < "${file}"
+    echo "${line}"
+}
+
+##
+# Check if input is a valid user.
+##
+bright_is_user()
+{
+    getent passwd "${1}" &> /dev/null
+    if [ $? -eq 0 ]
+    then
+        return 0
+    else
+        return 1
+    fi
+}
+
+##
+# Run script.
+##
 main "${@}"
