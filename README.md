@@ -4,7 +4,7 @@
 
 Control and display the screen brightness.
 
-## Requirements
+## Dependencies
 
 - xorg-xset
 
