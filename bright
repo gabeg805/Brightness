@@ -207,6 +207,12 @@ bright_delta()
     local delta="${2}"
     local percent=$(bright_get_percent)
     local value=$(echo "scale=4; ${percent} ${operator} ${delta}" | bc)
+
+	if [ "${value}" -eq 0 ]
+	then
+		value=1
+	fi
+
     bright_set "${value}"
     bright_print
 }
