@@ -41,6 +41,12 @@ EXIT_BRIGHT_INVALID_VALUE=
 ##
 main()
 {
+	if [ ! -d "${BACKLIGHT_DIR}" ]
+	then
+		echo "N/A"
+		return 1
+	fi
+
     if [ $# -eq 0 ]
     then
         bright_print
