@@ -206,7 +206,13 @@ bright_delta()
     local operator="${1}"
     local delta="${2}"
     local percent=$(bright_get_percent)
-    local value=$(echo "scale=4; ${percent} ${operator} ${delta}" | bc)
+
+	if [ ${percent} -eq 1 ]
+	then
+		delta=$[ ${delta} - 1 ]
+	fi
+
+    local value=$(echo "scale=0; ${percent} ${operator} ${delta}" | bc)
 
 	if [ "${value}" -eq 0 ]
 	then
@@ -244,7 +250,7 @@ bright_set()
     local check=$(echo "(0 <= ${value}) && (${value} <= 100)" | bc)
     if [ ${check} -eq 0 ]
     then
-        print_err "Unable to set brightness: Value must be between 0 to 100."
+        echo "Unable to set brightness: Value must be between 0 to 100." 1>&2
         exit ${EXIT_BRIGHT_INVALID_VALUE}
     fi
     local newvalue=$(echo "scale=4; ${value} * ${max} / 100" | bc)
