@@ -34,19 +34,14 @@ SHORT=
 ##
 # Exit statuses.
 ##
-EXIT_BRIGHT_INVALID_VALUE=
+EXIT_BRIGHT_CHECK_FAIL=10
+EXIT_BRIGHT_INVALID_VALUE=11
 
 ##
 # Main.
 ##
 main()
 {
-	if [ ! -d "${BACKLIGHT_DIR}" ]
-	then
-		echo "N/A"
-		return 1
-	fi
-
     if [ $# -eq 0 ]
     then
         bright_print
@@ -106,25 +101,25 @@ main()
     done
 
     # Run options
-    if [ -n "${DECREMENT}" ]
-    then
-        bright_decrement
-    elif [ -n "${INCREMENT}" ]
-    then
-        bright_increment
-    elif [ -n "${INIT}" ]
-    then
-        bright_init
-    elif [ -n "${OFF}" ]
-    then
-        bright_off
-    elif [ -n "${SET}" ]
-    then
-        bright_set "${SET}"
-        bright_print
-    else
-        bright_print
-    fi
+	if [ -n "${DECREMENT}" ]
+	then
+		bright_decrement
+	elif [ -n "${INCREMENT}" ]
+	then
+		bright_increment
+	elif [ -n "${INIT}" ]
+	then
+		bright_init
+	elif [ -n "${OFF}" ]
+	then
+		bright_off
+	elif [ -n "${SET}" ]
+	then
+		bright_set "${SET}"
+		bright_print
+	else
+		bright_print
+	fi
 
     return $?
 }
@@ -174,18 +169,44 @@ usage()
 }
 
 ##
+# Run checks before printing/modifying brightness level.
+##
+bright_check()
+{
+	if [ -d "${BACKLIGHT_DIR}" ]
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+##
 # Print brightness level.
 ##
 bright_print()
 {
-    local value=$(echo "$(bright_get_percent) / 1" | bc)
-    local msg="${value}%"
+	local value=
+    local message=
+	local ret=
+
+	if ! bright_check
+	then
+		message="N/A"
+		ret=${EXIT_BRIGHT_CHECK_FAIL}
+	else
+		value=$(echo "$(bright_get_percent) / 1" | bc)
+		message="${value}%"
+		ret=0
+	fi
+
     if [ -n "${SHORT}" ]
     then
-        echo "${msg}"
+        echo "${message}"
     else
-        echo "Brightness: ${msg}"
+        echo "Brightness: ${message}"
     fi
+	return ${ret}
 }
 
 ##
@@ -209,6 +230,12 @@ bright_increment()
 ##
 bright_delta()
 {
+	if ! bright_check
+	then
+		bright_print
+		return $?
+	fi
+
     local operator="${1}"
     local delta="${2}"
     local percent=$(bright_get_percent)
@@ -234,6 +261,12 @@ bright_delta()
 ##
 bright_init()
 {
+	if ! bright_check
+	then
+        echo "Unable to set brightness: Backlight directory does not exist." 1>&2
+        exit ${EXIT_BRIGHT_CHECK_FAIL}
+    fi
+
     echo ":: Initializing brightness settings."
     chmod 666 "${BRIGHTNESS_FILE}"
 }
@@ -251,14 +284,22 @@ bright_off()
 ##
 bright_set()
 {
+	if ! bright_check
+	then
+        echo "Unable to set brightness: Backlight directory does not exist." 1>&2
+        exit ${EXIT_BRIGHT_CHECK_FAIL}
+    fi
+
     local value="${1}"
     local max=$(bright_get_max)
     local check=$(echo "(0 <= ${value}) && (${value} <= 100)" | bc)
+
     if [ ${check} -eq 0 ]
     then
         echo "Unable to set brightness: Value must be between 0 to 100." 1>&2
         exit ${EXIT_BRIGHT_INVALID_VALUE}
     fi
+
     local newvalue=$(echo "scale=4; ${value} * ${max} / 100" | bc)
     bright_value_round "${newvalue}"> "${BRIGHTNESS_FILE}"
 }
