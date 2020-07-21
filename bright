@@ -27,6 +27,7 @@ DECREMENT=
 DELTA=5
 INCREMENT=
 INIT=
+NOTIFY=
 OFF=
 SET=
 SHORT=
@@ -49,8 +50,8 @@ main()
     fi
 
 	# Options
-    local short="hdD:ios:S"
-    local long="help,decrement,delta:,increment,init,off,set:,short"
+    local short="hdD:iNos:S"
+    local long="help,decrement,delta:,increment,init,notify,off,set:,short"
 	local args=
 
     # Parse options
@@ -83,6 +84,9 @@ main()
             --init)
                 INIT=true
                 ;;
+			-N|--notify)
+				NOTIFY=true
+				;;
             -o|--off)
                 OFF=true
                 ;;
@@ -206,6 +210,13 @@ bright_print()
     else
         echo "Brightness: ${message}"
     fi
+
+	if [ -n "${NOTIFY}" ]
+	then
+		local icon=$(bright_get_notification_icon "${value}")
+		notify-send -t 2000 "Brightness" "${message}" --icon="${icon}" &
+	fi
+
 	return ${ret}
 }
 
@@ -351,6 +362,33 @@ bright_get_max()
     local line=
     read -r line < "${file}"
     echo "${line}"
+}
+
+##
+# Return the notification icon for the given brightness level.
+##
+bright_get_notification_icon()
+{
+	local value="${1}"
+	local icon="display-brightness"
+
+	#if [ ${value} -eq 0 ]
+	#then
+	#	icon="audio-volume-muted"
+	#elif [ ${value} -gt 0 -a ${value} -lt 30 ]
+	#then
+	#	icon="audio-volume-low"
+	#elif [ ${value} -ge 30 -a ${value} -lt 60 ]
+	#then
+	#	icon="audio-volume-medium"
+	#elif [ ${value} -ge 60 ]
+	#then
+	#	icon="audio-volume-high"
+	#else
+	#	:
+	#fi
+
+	echo "${icon}"
 }
 
 ##
